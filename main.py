@@ -1,14 +1,13 @@
 import os
 import sys
 
-import openpyxl
 import requests
 import yaml
+import jieba
+import wordcloud
 
 
 def tencentdanmu(set_length, target_id, setname=None):
-    wb = openpyxl.Workbook()
-    sheet = wb.active
     headers = {
         'User-Agent': 'Googlebot'
     }
@@ -19,19 +18,36 @@ def tencentdanmu(set_length, target_id, setname=None):
         print('正在获取弹幕：' + url)
         res = requests.get(url, headers=headers).json(strict=False)
         list_content.extend([i['content'] for i in res['barrage_list']])
-    # for i in list_content:
-    #     sheet.append([i])
     results_url = os.path.abspath("results")
     result_abs = os.path.join(results_url, f'{setname}.txt')
-    # wb.save(result_abs)
-    # comments_file_path = 'lrcs_comments.txt'
-
-    # 获取comments中的弹幕信息并且写入指定路径
 
     with open(result_abs, 'w+', encoding='utf-8')as fin:
         for comment in list_content:
             fin.write(comment + '\n')
 
+    with open(result_abs, encoding='utf-8') as f:
+        t = f.read()
+        word_list = jieba.lcut_for_search(t)
+        new_word_list = ' '.join(word_list)
+        import platform
+        if 'Windows' == platform.system():
+            w = wordcloud.WordCloud(width=2000,
+                                    height=1400,
+                                    font_path="msyh.ttc")
+        else:
+            w = wordcloud.WordCloud(width=2000,
+                                    height=1400,
+                                    font_path="/System/Library/Fonts/PingFang.ttc")
+        w.generate(new_word_list)
+        w.to_file(os.path.join(os.path.abspath("yuntu"), f'{setname}.png'))
+    # with open(result_abs,'w+', encoding='utf-8') as file:
+    #     comment_text = file.read()
+    #     print(comment_text)
+    #     # 使用jieba精确模式，句子最精确地切开，适合文本分析
+    #     word_list = jieba.lcut_for_search(comment_text)
+    #     new_word_list = ' '.join(word_list)
+    #     print(new_word_list)
+    #     file.write(new_word_list)
 
 
 def read_yaml():
@@ -42,8 +58,8 @@ def read_yaml():
 
 
 if __name__ == '__main__':
-    if len(sys.argv)==1:
+    if len(sys.argv) == 1:
         for item in read_yaml():
             tencentdanmu(item['time'], item['key'], item['name'])
     else:
-        tencentdanmu(sys.argv[3],sys.argv[2],sys.argv[1])
+        tencentdanmu(sys.argv[3], sys.argv[2], sys.argv[1])
