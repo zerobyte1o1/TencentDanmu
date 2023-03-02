@@ -5,6 +5,9 @@ import requests
 import yaml
 import jieba
 import wordcloud
+from openpyxl import load_workbook
+from snownlp import SnowNLP
+import jieba.analyse as analyse
 
 
 def tencentdanmu(set_length, target_id, setname=None):
@@ -27,8 +30,17 @@ def tencentdanmu(set_length, target_id, setname=None):
 
     with open(result_abs, encoding='utf-8') as f:
         t = f.read()
-        word_list = jieba.lcut_for_search(t)
-        new_word_list = ' '.join(word_list)
+        for i in t:
+            if i == '哈' or i == 'ha':
+                t = t.replace(i, '')
+
+        keywords_top20 = analyse.extract_tags(t, withWeight=True, topK=20)
+        print('top20关键词及权重：')
+        print(keywords_top20)
+        sentiment_analyse(t, setname, keywords_top20)
+        # word_list = jieba.lcut_for_search(t)
+        # new_word_list = ' '.join(word_list)
+
         import platform
         if 'Windows' == platform.system():
             w = wordcloud.WordCloud(width=2000,
@@ -38,16 +50,39 @@ def tencentdanmu(set_length, target_id, setname=None):
             w = wordcloud.WordCloud(width=2000,
                                     height=1400,
                                     font_path="/System/Library/Fonts/PingFang.ttc")
-        w.generate(new_word_list)
+        w.generate(t)
         w.to_file(os.path.join(os.path.abspath("yuntu"), f'{setname}.png'))
-    # with open(result_abs,'w+', encoding='utf-8') as file:
-    #     comment_text = file.read()
-    #     print(comment_text)
-    #     # 使用jieba精确模式，句子最精确地切开，适合文本分析
-    #     word_list = jieba.lcut_for_search(comment_text)
-    #     new_word_list = ' '.join(word_list)
-    #     print(new_word_list)
-    #     file.write(new_word_list)
+
+
+def sentiment_analyse(v_cmt_list, setname, keywords_top20):
+    """
+    情感分析打分
+    :param v_cmt_list: 需要处理的评论列表
+    :return:
+    """
+    score_list = []  # 情感评分值
+    tag_list = []  # 打标分类结果
+    pos_count = 0  # 计数器-积极
+    neg_count = 0  # 计数器-消极
+    for comment in v_cmt_list:
+        tag = ''
+        sentiments_score = SnowNLP(comment).sentiments
+        if sentiments_score < 0.4:
+            tag = '消极'
+            neg_count += 1
+        else:
+            tag = '积极'
+            pos_count += 1
+        score_list.append(sentiments_score)  # 得分值
+        tag_list.append(tag)  # 判定结果
+
+    print('消极评价占比：', round(neg_count / (pos_count + neg_count), 4))
+    wb = load_workbook(os.path.join(os.path.abspath('emotions'), "情绪分析.xlsx"))
+    ws = wb['Sheet1']
+    ws.append([setname, "积极评价", round(pos_count / (pos_count + neg_count), 4)])
+    ws.append([setname, "消极评价", round(neg_count / (pos_count + neg_count), 4), str(keywords_top20)])
+    wb.save(os.path.join(os.path.abspath('emotions'), "情绪分析.xlsx"))
+    print('情感分析结果已生成：情感分析')
 
 
 def read_yaml():
